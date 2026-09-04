@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Agentic Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar / Drawer -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-title">Agent OS</div>
+            <div class="brand-subtitle">Enterprise RAG</div>
+          </div>
+        </div>
+        <button class="mobile-close-btn" id="mobileCloseBtn" aria-label="Close sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- Live System Status -->
+        <div class="panel-section">
+          <div class="section-label">Observability & Core</div>
+          <div class="status-card">
+            <div class="status-row">
+              <span class="status-indicator live-pulse"></span>
+              <span class="status-name">Logfire</span>
+              <span class="status-val success">Connected &amp; Tracing</span>
+            </div>
+            <div class="status-row">
+              <span class="status-bullet"></span>
+              <span class="status-name">Reasoning Model</span>
+              <span class="status-val mono" id="modelBadge">openai/gpt-oss-120b</span>
+            </div>
+            <div class="status-row">
+              <span class="status-bullet"></span>
+              <span class="status-name">Embeddings</span>
+              <span class="status-val mono">all-MiniLM-L6-v2 (Local)</span>
+            </div>
+            <div class="status-row">
+              <span class="status-bullet"></span>
+              <span class="status-name">Vector DB</span>
+              <span class="status-val mono">Qdrant Cloud</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Session Memory Management -->
+        <div class="panel-section">
+          <div class="section-label">Session Memory</div>
+          <div class="memory-card">
+            <div class="memory-info">
+              <span class="memory-label">Memory ID:</span>
+              <span class="memory-id mono" id="memoryIdDisplay">--------</span>
+              <button class="icon-btn" id="copyMemoryIdBtn" title="Copy Memory ID">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </div>
+            <button class="btn btn-danger-soft" id="clearMemoryBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Clear History &amp; Memory
+            </button>
+          </div>
+        </div>
+
+        <!-- Suggested Technical Prompts -->
+        <div class="panel-section flex-grow">
+          <div class="section-label">Suggested Inquiries</div>
+          <div class="suggestions-list">
+            <button class="suggestion-item" data-prompt="How do you start Redis for a Kubernetes work queue?">
+              <span>How do you start Redis for a Kubernetes work queue?</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            </button>
+            <button class="suggestion-item" data-prompt="What is the difference between HPA and VPA in Kubernetes?">
+              <span>Difference between HPA and VPA autoscaling</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            </button>
+            <button class="suggestion-item" data-prompt="What are the completions and parallelism fields in a Kubernetes Job spec?">
+              <span>Completions &amp; parallelism in Kubernetes Jobs</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            </button>
+            <button class="suggestion-item" data-prompt="What Databricks CLI command retrieves details of a specific job?">
+              <span>Managing Databricks jobs via CLI &amp; API</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="footer-note">Grounded on Enterprise Knowledge Base</span>
+      </div>
+    </aside>
+
+    <!-- Main Chat View -->
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-toggle-btn" id="mobileToggleBtn" aria-label="Open sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <div class="chat-title-group">
+            <h1 class="chat-title">Enterprise Agentic Assistant</h1>
+            <span class="chat-badge">GPT-OSS-120B · FlashRank</span>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <div class="system-status-chip">
+            <span class="chip-dot"></span>
+            <span>Online</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Messages Thread -->
+      <div class="messages-container" id="messagesContainer">
+        <!-- Hero screen shown when thread is empty -->
+        <div class="hero-welcome" id="heroWelcome">
+          <div class="hero-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <h2 class="hero-title">How can I assist with your infrastructure today?</h2>
+          <p class="hero-desc">Ask questions about Kubernetes deployments, job scheduling, autoscaling, Intel architecture, or Databricks workflows.</p>
+          
+          <div class="hero-chips">
+            <div class="hero-chip" data-prompt="How do you start Redis for a Kubernetes work queue?">
+              <div class="chip-title">Redis Work Queue</div>
+              <div class="chip-desc">How to deploy and configure Redis in Kubernetes</div>
+            </div>
+            <div class="hero-chip" data-prompt="What is the difference between HPA and VPA in Kubernetes?">
+              <div class="chip-title">HPA vs VPA</div>
+              <div class="chip-desc">Horizontal vs Vertical Pod Autoscaling breakdown</div>
+            </div>
+            <div class="hero-chip" data-prompt="How do CronJobs handle pod restarts in Kubernetes?">
+              <div class="chip-title">CronJobs &amp; Restart Policies</div>
+              <div class="chip-desc">OnFailure vs Never restart policies for Jobs</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat messages dynamically rendered here -->
+        <div class="chat-thread" id="chatThread"></div>
+      </div>
+
+      <!-- Input Dock -->
+      <div class="dock-container">
+        <div class="dock-wrapper">
+          <!-- Active generation control bar (hidden until streaming) -->
+          <div class="generation-bar" id="generationBar" style="display: none;">
+            <div class="gen-indicator">
+              <span class="gen-pulse"></span>
+              <span class="gen-status-text" id="genStatusText">Agent is reasoning &amp; synthesizing...</span>
+            </div>
+            <button class="btn-stop" id="stopResponseBtn" title="Stop generating response">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+              </svg>
+              <span>Stop Response</span>
+            </button>
+          </div>
+
+          <!-- Prompt Box -->
+          <form class="prompt-form" id="promptForm">
+            <textarea 
+              id="promptInput" 
+              class="prompt-textarea" 
+              placeholder="Ask about your documentation... (Shift+Enter for newline)" 
+              rows="1" 
+              autocomplete="off"
+            ></textarea>
+            <div class="dock-actions">
+              <button type="submit" class="btn-send" id="sendBtn" aria-label="Send query">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"></line>
+                  <polyline points="5 12 12 5 19 12"></polyline>
+                </svg>
+              </button>
+            </div>
+          </form>
+          <div class="dock-footer">
+            <span>Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for new line</span>
+            <span class="footer-sep">·</span>
+            <span>Safety Guardrails Active</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast" role="alert"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
