@@ -179,10 +179,11 @@ async def query_stream(request: QueryRequest):
                     content = doc.get("content", "")
                     if content not in seen_texts:
                         seen_texts.add(content)
+                        raw_score = doc.get("score")
                         sources.append({
                             "source": doc.get("source", "Document"),
                             "content": content,
-                            "score": doc.get("score")
+                            "score": float(raw_score) if raw_score is not None else None
                         })
 
                 yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"

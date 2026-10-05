@@ -55,7 +55,8 @@ def rerank_documents(query: str, documents: list, top_n: int = 5) -> list:
             orig_doc = documents[orig_idx]
             if is_dict:
                 updated_doc = dict(orig_doc)
-                updated_doc["score"] = res.get("score")
+                raw_score = res.get("score")
+                updated_doc["score"] = float(raw_score) if raw_score is not None else None
                 reranked_docs.append(updated_doc)
             else:
                 reranked_docs.append(res["text"])

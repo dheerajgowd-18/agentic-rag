@@ -42,7 +42,7 @@ def search_enterprise_knowledge(query: str, limit: int = 8, score_threshold: flo
             results.append({
                 "content": res.payload.get("text", ""),
                 "source": res.payload.get("source", "Unknown"),
-                "score": res.score
+                "score": float(res.score) if res.score is not None else None
             })
 
         logfire.info(f"Qdrant retrieved {len(results)} points above score threshold ({threshold}).")
