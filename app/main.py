@@ -20,9 +20,10 @@ logfire.configure(token=os.getenv("LOGFIRE_TOKEN"))
 
 # Safe to import app modules - logfire is already active
 from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.config import settings
@@ -34,9 +35,17 @@ from app.services.retrieval.qdrant_service import search_enterprise_knowledge
 from app.services.retrieval.ranking_service import rerank_documents
 
 
-
 # Initialize FastAPI
 app = FastAPI(title="Enterprise Agentic RAG API")
+
+# Add CORS middleware for secure web frontend communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mount static files for modern HTML/CSS/JS frontend
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -50,12 +59,25 @@ def startup_event():
 
 
 class QueryRequest(BaseModel):
-    q: str
-    thread_id: Optional[str] = "default_user"
+    q: str = Field(..., min_length=1, max_length=4000, description="User question")
+    thread_id: Optional[str] = Field(
+        default="default_user",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Alphanumeric thread ID for session memory"
+    )
 
 
 class ClearMemoryRequest(BaseModel):
-    thread_id: str
+    thread_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Thread ID to clear"
+    )
+
 
 
 # ── UI Route ──────────────────────────────────────────────────────────────────
