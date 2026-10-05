@@ -25,34 +25,40 @@ GATEWAY_CONFIG = {
 
 PORTKEY_CONFIG_ID = getattr(settings, "PORTKEY_CONFIG_ID", None) or os.getenv("PORTKEY_CONFIG_ID")
 
-# Determine active gateway configuration (remote ID takes precedence over local dict)
-ACTIVE_GATEWAY_CONFIG = PORTKEY_CONFIG_ID or GATEWAY_CONFIG
+# Only use remote config ID by default if provided; otherwise, use standard Portkey client
+# because Portkey accounts often have 'block_inline_config' enabled by default.
+ACTIVE_GATEWAY_CONFIG = PORTKEY_CONFIG_ID if PORTKEY_CONFIG_ID else None
 
-try:
-    portkey_client = Portkey(
-        api_key=settings.PORTKEY_API_KEY,
-        config=ACTIVE_GATEWAY_CONFIG
-    )
-    logfire.info("🌐 Portkey gateway initialized with fallback & retry policies.")
-except Exception as e:
-    logfire.warning(f"⚠️ Portkey initialization with config failed ({e}), falling back to standard client.")
+if ACTIVE_GATEWAY_CONFIG:
+    try:
+        portkey_client = Portkey(
+            api_key=settings.PORTKEY_API_KEY,
+            config=ACTIVE_GATEWAY_CONFIG
+        )
+        logfire.info(f"🌐 Portkey gateway initialized with config ID: {ACTIVE_GATEWAY_CONFIG}")
+    except Exception as e:
+        logfire.warning(f"⚠️ Portkey initialization with config failed ({e}), using standard client.")
+        portkey_client = Portkey(api_key=settings.PORTKEY_API_KEY)
+else:
     portkey_client = Portkey(api_key=settings.PORTKEY_API_KEY)
+    logfire.info("🌐 Portkey client initialized.")
 
 
 def get_langchain_llm(feature: str = "rag") -> ChatOpenAI:
     """
     Returns a Portkey-backed ChatOpenAI — a drop-in for ChatGroq in LangChain nodes.
-    Inherits retry, caching, and fallback policies via Portkey headers.
+    Inherits retry, caching, and routing via Portkey headers.
     """
     header_kwargs = {
         "api_key": settings.PORTKEY_API_KEY,
-        "config": ACTIVE_GATEWAY_CONFIG,
         "metadata": {
             "feature": feature,
             "_user": "rag-system",
             "environment": "production"
         }
     }
+    if ACTIVE_GATEWAY_CONFIG:
+        header_kwargs["config"] = ACTIVE_GATEWAY_CONFIG
 
     return ChatOpenAI(
         api_key=settings.PORTKEY_API_KEY,
