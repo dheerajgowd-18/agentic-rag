@@ -165,11 +165,13 @@ async def query_stream(request: QueryRequest):
             else:
                 yield f"data: {json.dumps({'type': 'thought', 'step': f'Intent: Technical inquiry (Searching for: {decision})'})}\n\n"
                 yield f"data: {json.dumps({'type': 'thought', 'step': '🔍 Searching Qdrant Vector Cloud for matching documentation...'})}\n\n"
-                raw_results = search_enterprise_knowledge(decision, limit=15)
+                raw_results = await asyncio.to_thread(search_enterprise_knowledge, decision, limit=15)
 
                 yield f"data: {json.dumps({'type': 'thought', 'step': f'Retrieved {len(raw_results)} candidates. Running FlashRank cross-encoder...'})}\n\n"
-                reranked_docs = rerank_documents(decision, raw_results, top_n=5)
+                from app.services.retrieval.ranking_service import rerank_documents_async
+                reranked_docs = await rerank_documents_async(decision, raw_results, top_n=5)
                 yield f"data: {json.dumps({'type': 'thought', 'step': f'⚖️ FlashRank reranking complete. Selected top {len(reranked_docs)} semantic chunks.'})}\n\n"
+
 
                 # Extract deduplicated sources preserving filenames and scores
                 seen_texts = set()

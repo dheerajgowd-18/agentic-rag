@@ -109,6 +109,14 @@ def embed_query(query: str) -> list[float]:
     return _active_model.encode([query])[0].tolist()
 
 
+import asyncio
+
+async def embed_query_async(query: str) -> list[float]:
+    """Non-blocking async wrapper around embed_query."""
+    return await asyncio.to_thread(embed_query, query)
+
+
+
 def embed_texts(texts: list[str]) -> list[list[float]]:
     _init()
     all_embeddings: list[list[float]] = []

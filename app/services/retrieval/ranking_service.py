@@ -71,3 +71,14 @@ def rerank_documents(query: str, documents: list, top_n: int = 5) -> list:
         # Fallback to the original order to ensure the user still gets an answer
         return documents[:top_n]
 
+
+import asyncio
+
+async def rerank_documents_async(query: str, documents: list, top_n: int = 5) -> list:
+    """
+    Non-blocking async wrapper around rerank_documents.
+    Executes CPU-bound ONNX model inference in a background worker thread.
+    """
+    return await asyncio.to_thread(rerank_documents, query, documents, top_n)
+
+
