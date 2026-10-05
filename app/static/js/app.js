@@ -462,6 +462,9 @@
           trimmed.startsWith('<blockquote') || trimmed.startsWith('<table')) {
         return trimmed;
       }
+      return trimmed ? `<p>${trimmed}</p>` : '';
+    }).join('\n');
+
     // Inline citations: [1], [2], [1][2]
     html = html.replace(/\[(\d+)\]/g, (match, num) => {
       return `<button class="citation-tag" data-citation-num="${num}" title="Jump to Source [${num}]">[${num}]</button>`;
