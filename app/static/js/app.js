@@ -355,7 +355,9 @@
       updateAnswer(mdText) {
         answerContent.innerHTML = renderMarkdown(mdText) + '<span class="typing-cursor">▌</span>';
         bindCodeCopyButtons(answerContent);
+        bindCitationButtons(answerContent);
       },
+
       renderSources(sources) {
         if (!sources || sources.length === 0) return;
         sourcesBox.style.display = 'block';
@@ -365,15 +367,18 @@
         sources.forEach((s, idx) => {
           const card = document.createElement('div');
           card.className = 'source-card';
+          card.id = `source-card-${idx + 1}`;
+          card.setAttribute('data-source-index', String(idx + 1));
           card.innerHTML = `
             <div class="source-card-header">
-              <span class="source-badge">Chunk ${idx + 1} · ${escapeHtml(s.source || 'Document')}</span>
+              <span class="source-badge">Source [${idx + 1}] · ${escapeHtml(s.source || 'Document')}</span>
             </div>
             <div class="source-preview">${escapeHtml(s.content || '')}</div>
           `;
           sourcesListEl.appendChild(card);
         });
       },
+
       finalize(stepsCount) {
         const spinner = thoughtBox.querySelector('.thought-icon-spinner');
         if (spinner) spinner.remove();
@@ -457,11 +462,35 @@
           trimmed.startsWith('<blockquote') || trimmed.startsWith('<table')) {
         return trimmed;
       }
-      return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
-    }).join('');
+    // Inline citations: [1], [2], [1][2]
+    html = html.replace(/\[(\d+)\]/g, (match, num) => {
+      return `<button class="citation-tag" data-citation-num="${num}" title="Jump to Source [${num}]">[${num}]</button>`;
+    });
 
     return html;
   }
+
+  function bindCitationButtons(container) {
+    container.querySelectorAll('.citation-tag').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        const num = btn.getAttribute('data-citation-num');
+        const sourceCard = document.getElementById(`source-card-${num}`);
+        const sourcesAccordion = container.closest('.message-assistant')?.querySelector('.sources-accordion');
+
+        if (sourcesAccordion && !sourcesAccordion.classList.contains('open')) {
+          sourcesAccordion.classList.add('open');
+        }
+
+        if (sourceCard) {
+          sourceCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          sourceCard.classList.add('highlight-glow');
+          setTimeout(() => sourceCard.classList.remove('highlight-glow'), 2000);
+        }
+      };
+    });
+  }
+
 
   function bindCodeCopyButtons(container) {
     container.querySelectorAll('.code-copy-btn').forEach(btn => {
