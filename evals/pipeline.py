@@ -13,10 +13,10 @@ import os
 import requests
 import logfire
 
-API_URL = "http://localhost:8000/query"
-RESPONSE_TRUNCATE = 300
-DELAY_BETWEEN_CALLS = 10   # seconds — stays within Groq RPM on the main key
-REQUEST_TIMEOUT = 120      # seconds — guardrails + LangGraph + Groq can take >60s
+API_URL = os.getenv("EVAL_API_URL", "http://localhost:8000/query")
+RESPONSE_TRUNCATE = int(os.getenv("EVAL_RESPONSE_TRUNCATE", "2000"))
+DELAY_BETWEEN_CALLS = int(os.getenv("EVAL_DELAY_BETWEEN_CALLS", "10"))   # seconds — stays within Groq RPM on the main key
+REQUEST_TIMEOUT = int(os.getenv("EVAL_REQUEST_TIMEOUT", "120"))      # seconds — guardrails + LangGraph + Groq can take >60s
 
 
 

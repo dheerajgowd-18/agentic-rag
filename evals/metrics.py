@@ -25,14 +25,14 @@ from ragas.metrics.collections import (
     AnswerCorrectness,
 )
 
-GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 JUDGE_MODEL = os.getenv("JUDGE_MODEL") or "openai/gpt-oss-20b"
-COOLDOWN_STANDARD = 62
-COOLDOWN_MINI = 40       # between individual samples — lets sliding TPM window recover (~2,800 tok/sample)
-GENERAL_BATCH_SIZE = 1  # one sample at a time: abatch_score fires calls concurrently per sample,
+COOLDOWN_STANDARD = int(os.getenv("EVAL_COOLDOWN_STANDARD", "62"))
+COOLDOWN_MINI = int(os.getenv("EVAL_COOLDOWN_MINI", "40"))       # between individual samples — lets sliding TPM window recover (~2,800 tok/sample)
+GENERAL_BATCH_SIZE = int(os.getenv("EVAL_BATCH_SIZE", "1"))  # one sample at a time: abatch_score fires calls concurrently per sample,
                          # so batch>1 stacks multiple samples' async calls inside the same second
-CONTEXT_TRUNCATE = 300  # chars per context chunk — reduces single request from ~7,700 to ~400 tokens
-CONTEXT_LIMIT = 2       # number of context chunks passed to RAGAS per sample
+CONTEXT_TRUNCATE = int(os.getenv("EVAL_CONTEXT_TRUNCATE", "1000"))  # chars per context chunk — configurable for high-fidelity evaluation
+CONTEXT_LIMIT = int(os.getenv("EVAL_CONTEXT_LIMIT", "3"))       # number of context chunks passed to RAGAS per sample
 
 
 def _build_judge():
