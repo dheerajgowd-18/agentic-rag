@@ -26,9 +26,12 @@ class Settings:
     PORTKEY_API_KEY = os.getenv("PORTKEY_API_KEY")
     GROQ_SLUG = os.getenv("PORTKEY_GROQ_SLUG") or "rag"       # primary slug in Portkey
     GROQ_SLUG_2 = os.getenv("PORTKEY_GROQ_SLUG_2") or "brag"  # fallback slug in Portkey
+    PORTKEY_CONFIG_ID = os.getenv("PORTKEY_CONFIG_ID")
 
-    
-    # --- OBSERVABILITY ---
+    # --- SESSION PERSISTENCE ---
+    CHECKPOINT_PERSISTENCE = os.getenv("CHECKPOINT_PERSISTENCE", "memory").lower()
+    CHECKPOINT_DB_PATH = os.getenv("CHECKPOINT_DB_PATH", "checkpoints.sqlite")
+
     LANGSMITH_TRACING = os.getenv("LANGSMITH_TRACING", "true")
     LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
     LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "rag_scale_test")

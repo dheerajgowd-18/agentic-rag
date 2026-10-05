@@ -25,31 +25,34 @@ GATEWAY_CONFIG = {
 
 PORTKEY_CONFIG_ID = getattr(settings, "PORTKEY_CONFIG_ID", None) or os.getenv("PORTKEY_CONFIG_ID")
 
-if PORTKEY_CONFIG_ID:
+# Determine active gateway configuration (remote ID takes precedence over local dict)
+ACTIVE_GATEWAY_CONFIG = PORTKEY_CONFIG_ID or GATEWAY_CONFIG
+
+try:
     portkey_client = Portkey(
         api_key=settings.PORTKEY_API_KEY,
-        config=PORTKEY_CONFIG_ID
+        config=ACTIVE_GATEWAY_CONFIG
     )
-else:
-    portkey_client = Portkey(
-        api_key=settings.PORTKEY_API_KEY
-    )
+    logfire.info("🌐 Portkey gateway initialized with fallback & retry policies.")
+except Exception as e:
+    logfire.warning(f"⚠️ Portkey initialization with config failed ({e}), falling back to standard client.")
+    portkey_client = Portkey(api_key=settings.PORTKEY_API_KEY)
 
 
 def get_langchain_llm(feature: str = "rag") -> ChatOpenAI:
     """
     Returns a Portkey-backed ChatOpenAI — a drop-in for ChatGroq in LangChain nodes.
+    Inherits retry, caching, and fallback policies via Portkey headers.
     """
     header_kwargs = {
         "api_key": settings.PORTKEY_API_KEY,
+        "config": ACTIVE_GATEWAY_CONFIG,
         "metadata": {
             "feature": feature,
             "_user": "rag-system",
             "environment": "production"
         }
     }
-    if PORTKEY_CONFIG_ID:
-        header_kwargs["config"] = PORTKEY_CONFIG_ID
 
     return ChatOpenAI(
         api_key=settings.PORTKEY_API_KEY,
@@ -58,6 +61,7 @@ def get_langchain_llm(feature: str = "rag") -> ChatOpenAI:
         temperature=0,
         default_headers=createHeaders(**header_kwargs)
     )
+
 
 def extract_cache_status(response) -> str:
     """
