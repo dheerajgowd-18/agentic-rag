@@ -16,8 +16,14 @@ def retrieve_node(state: AgentState):
         raw_results = search_enterprise_knowledge(query, limit=15)
         logfire.info(f"Retrieved {len(raw_results)} candidates from Vector DB")
         
-        doc_contents = [doc['content'] for doc in raw_results]
-        
+        if not raw_results:
+            logfire.warning(f"No documents met the relevance threshold for query: '{query}'.")
+            return {
+                "documents": [],
+                "status": "No sufficiently relevant documentation found.",
+                "plan": state["plan"] + ["Context Retrieval: No relevant documentation found (below threshold)"]
+            }
+
         with logfire.span("⚖️ Semantic Reranking"):
             reranked_docs = rerank_documents(query, raw_results, top_n=5)
             logfire.info("Reranking complete. Kept top 5 most relevant chunks with metadata.")
@@ -27,4 +33,5 @@ def retrieve_node(state: AgentState):
         "status": "Found technical context.",
         "plan": state["plan"] + ["Context Retrieved"]
     }
+
 

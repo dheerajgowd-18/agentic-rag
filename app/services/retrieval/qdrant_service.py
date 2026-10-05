@@ -11,21 +11,31 @@ client = QdrantClient(
     api_key=settings.QDRANT_API_KEY
 )
 
-def search_enterprise_knowledge(query: str, limit: int = 8):
+import os
+
+DEFAULT_SCORE_THRESHOLD = float(os.getenv("QDRANT_SCORE_THRESHOLD", "0.30"))
+
+
+def search_enterprise_knowledge(query: str, limit: int = 8, score_threshold: float = None):
     """
     Performs a high-precision search in the enterprise knowledge base.
-    Uses the modern query_points interface.
+    Filters candidates by score_threshold to eliminate low-relevance noise.
     """
     try:
         query_vector = embed_query(query)
+        threshold = score_threshold if score_threshold is not None else DEFAULT_SCORE_THRESHOLD
 
         # Using query_points - the modern standard for Qdrant
-        response = client.query_points(
-            collection_name=settings.QDRANT_COLLECTION,
-            query=query_vector,
-            limit=limit,
-            with_payload=True # JSON
-        )
+        query_kwargs = {
+            "collection_name": settings.QDRANT_COLLECTION,
+            "query": query_vector,
+            "limit": limit,
+            "with_payload": True,
+        }
+        if threshold and threshold > 0:
+            query_kwargs["score_threshold"] = threshold
+
+        response = client.query_points(**query_kwargs)
 
         results = []
         for res in response.points:
@@ -34,8 +44,10 @@ def search_enterprise_knowledge(query: str, limit: int = 8):
                 "source": res.payload.get("source", "Unknown"),
                 "score": res.score
             })
-        
+
+        logfire.info(f"Qdrant retrieved {len(results)} points above score threshold ({threshold}).")
         return results
     except Exception as e:
         logfire.error(f"❌ Qdrant Search Failed: {e}")
         return []
+
