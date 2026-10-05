@@ -27,10 +27,12 @@ from typing import Optional
 
 from app.config import settings
 from app.agents.graph import rag_agent
+from app.agents.nodes.responder import build_responder_prompt
 from app.guardrails import initialize_rails, guard, guard_async
-from app.gateway import portkey_client, get_langchain_llm
+from app.gateway import portkey_client
 from app.services.retrieval.qdrant_service import search_enterprise_knowledge
 from app.services.retrieval.ranking_service import rerank_documents
+
 
 
 # Initialize FastAPI
@@ -123,97 +125,48 @@ async def query_stream(request: QueryRequest):
             yield f"data: {json.dumps({'type': 'thought', 'step': '🛡️ Guardrails passed — evaluating intent'})}\n\n"
 
 
-            # Gate 2: Fetch history from LangGraph checkpointer
+            # Gate 2: Fetch history and prepare turn
             state_checkpoint = rag_agent.get_state(config)
-            history_msgs = state_checkpoint.values.get("messages", []) if state_checkpoint else []
+            history_msgs = list(state_checkpoint.values.get("messages", [])) if state_checkpoint else []
+            turn_messages = history_msgs + [{"role": "user", "content": q}]
 
-            history_str = ""
-            for msg in history_msgs:
-                role = "User" if msg["role"] == "user" else "Assistant"
-                history_str += f"{role}: {msg['content']}\n"
-
-            # Gate 3: Planner Node
+            # Gate 3: Planner Node Evaluation
             yield f"data: {json.dumps({'type': 'thought', 'step': '🧠 Planner node: analyzing conversation context...'})}\n\n"
-            planner_prompt = f"""
-            You are an intelligent Assistant Planner. 
-            Analyze the conversation history and the latest user message.
-            
-            CONVERSATION HISTORY:
-            {history_str}
-            
-            LATEST MESSAGE:
-            "{q}"
-            
-            Task:
-            1. If the latest message is a greeting (hi, hello) or a question that can be answered using ONLY the conversation history above, respond with 'CONVERSATIONAL'.
-            2. If it is a technical question about Kubernetes, Intel, or Networking that requires fresh documentation, output a refined search query.
-            
-            Output ONLY 'CONVERSATIONAL' or the search query.
-            """
-            planner_llm = get_langchain_llm(feature="planner")
-            decision = planner_llm.invoke(planner_prompt).content.strip()
+            from app.agents.nodes.planner import evaluate_planner
+            decision = evaluate_planner(turn_messages)
 
             sources = []
+            reranked_docs = []
+
             if decision == "CONVERSATIONAL":
                 yield f"data: {json.dumps({'type': 'thought', 'step': 'Intent: Conversational / Memory (Vector search skipped)'})}\n\n"
-                prompt = f"""
-                You are a friendly and helpful Enterprise AI Assistant.
-                Answer the user's latest message using the CONVERSATION HISTORY below.
-
-                CONVERSATION HISTORY:
-                {history_str}
-
-                LATEST MESSAGE:
-                "{q}"
-                """
             else:
                 yield f"data: {json.dumps({'type': 'thought', 'step': f'Intent: Technical inquiry (Searching for: {decision})'})}\n\n"
                 yield f"data: {json.dumps({'type': 'thought', 'step': '🔍 Searching Qdrant Vector Cloud for matching documentation...'})}\n\n"
                 raw_results = search_enterprise_knowledge(decision, limit=15)
-                doc_contents = [doc['content'] for doc in raw_results]
 
-                yield f"data: {json.dumps({'type': 'thought', 'step': f'Retrieved {len(doc_contents)} candidates. Running FlashRank cross-encoder...'})}\n\n"
-                reranked_contents = rerank_documents(decision, doc_contents, top_n=5)
-                yield f"data: {json.dumps({'type': 'thought', 'step': '⚖️ FlashRank reranking complete. Selected top 5 semantic chunks.'})}\n\n"
+                yield f"data: {json.dumps({'type': 'thought', 'step': f'Retrieved {len(raw_results)} candidates. Running FlashRank cross-encoder...'})}\n\n"
+                reranked_docs = rerank_documents(decision, raw_results, top_n=5)
+                yield f"data: {json.dumps({'type': 'thought', 'step': f'⚖️ FlashRank reranking complete. Selected top {len(reranked_docs)} semantic chunks.'})}\n\n"
 
-                for raw in raw_results:
-                    if raw['content'] in reranked_contents:
-                        sources.append({"source": raw.get("source", "Document"), "content": raw['content']})
-
-                # Deduplicate sources
+                # Extract deduplicated sources preserving filenames and scores
                 seen_texts = set()
-                unique_sources = []
-                for s in sources:
-                    if s['content'] not in seen_texts:
-                        seen_texts.add(s['content'])
-                        unique_sources.append(s)
-                sources = unique_sources
+                for doc in reranked_docs:
+                    content = doc.get("content", "")
+                    if content not in seen_texts:
+                        seen_texts.add(content)
+                        sources.append({
+                            "source": doc.get("source", "Document"),
+                            "content": content,
+                            "score": doc.get("score")
+                        })
 
                 yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
 
-                max_context_chars = 25000
-                full_context = ""
-                for doc in reranked_contents:
-                    if len(full_context) + len(doc) < max_context_chars:
-                        full_context += f"CONTENT: {doc}\n\n"
-
-                prompt = f"""
-                You are a Senior Technical Architect.
-                Answer the question using the TECHNICAL CONTEXT provided.
-
-                TECHNICAL CONTEXT:
-                {full_context}
-
-                CONVERSATION HISTORY:
-                {history_str}
-
-                USER QUESTION:
-                "{q}"
-                """
-
-            # Gate 4: Streaming LLM Synthesis
+            # Gate 4: Streaming LLM Synthesis using shared prompt builder
+            prompt = build_responder_prompt(decision, turn_messages, reranked_docs)
             yield f"data: {json.dumps({'type': 'thought', 'step': f'✍️ Synthesizing response via {settings.GROQ_MODEL}...' })}\n\n"
-            
+
             full_answer = ""
             stream = portkey_client.chat.completions.create(
                 model=f"@{settings.GROQ_SLUG}/{settings.GROQ_MODEL}",
@@ -234,7 +187,10 @@ async def query_stream(request: QueryRequest):
                 "messages": [
                     {"role": "user", "content": q},
                     {"role": "assistant", "content": full_answer}
-                ]
+                ],
+                "current_query": decision,
+                "documents": reranked_docs,
+                "status": "Response generated."
             })
 
             yield f"data: {json.dumps({'type': 'done', 'status': 'complete', 'sources': sources})}\n\n"
@@ -248,6 +204,7 @@ async def query_stream(request: QueryRequest):
             yield f"data: {done_payload}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
 
 
 # ── Clear Memory Endpoint ─────────────────────────────────────────────────────
