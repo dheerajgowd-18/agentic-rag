@@ -98,15 +98,30 @@ async def query_stream(request: QueryRequest):
         try:
             # Gate 1: NeMo Guardrails
             yield f"data: {json.dumps({'type': 'thought', 'step': '🛡️ Checking NeMo Guardrails safety gate...'})}\n\n"
-            rail_fired, rail_response = await guard_async(q)
-            if rail_fired:
+            is_blocked, is_dialog, rail_response = await guard_async(q)
+            if is_blocked:
                 logfire.info(f"🛡️ Guardrails blocked query: {q[:60]}")
                 yield f"data: {json.dumps({'type': 'thought', 'step': '🛡️ Guardrails filter triggered — direct safety response'})}\n\n"
                 yield f"data: {json.dumps({'type': 'token', 'content': rail_response})}\n\n"
                 yield f"data: {json.dumps({'type': 'done', 'status': 'Blocked by guardrails', 'sources': []})}\n\n"
                 return
 
+            if is_dialog:
+                logfire.info(f"💬 Guardrails dialog turn: {q[:60]}")
+                yield f"data: {json.dumps({'type': 'thought', 'step': '💬 Conversational greeting/dialog flow handled directly'})}\n\n"
+                yield f"data: {json.dumps({'type': 'token', 'content': rail_response})}\n\n"
+                # Update memory so the greeting is remembered
+                rag_agent.update_state(config, {
+                    "messages": [
+                        {"role": "user", "content": q},
+                        {"role": "assistant", "content": rail_response}
+                    ]
+                })
+                yield f"data: {json.dumps({'type': 'done', 'status': 'complete', 'sources': []})}\n\n"
+                return
+
             yield f"data: {json.dumps({'type': 'thought', 'step': '🛡️ Guardrails passed — evaluating intent'})}\n\n"
+
 
             # Gate 2: Fetch history from LangGraph checkpointer
             state_checkpoint = rag_agent.get_state(config)
@@ -271,8 +286,8 @@ def query(request: QueryRequest):
     config = {"configurable": {"thread_id": thread_id}}
     
     try:
-        rail_fired, rail_response = guard(q)
-        if rail_fired:
+        is_blocked, is_dialog, rail_response = guard(q)
+        if is_blocked:
             logfire.info(f"🛡️ Request blocked by guardrails | thread={thread_id}")
             return {
                 "question": q,
@@ -282,7 +297,24 @@ def query(request: QueryRequest):
                 "sources": []
             }
 
+        if is_dialog:
+            logfire.info(f"💬 Conversational dialog flow handled | thread={thread_id}")
+            rag_agent.update_state(config, {
+                "messages": [
+                    {"role": "user", "content": q},
+                    {"role": "assistant", "content": rail_response}
+                ]
+            })
+            return {
+                "question": q,
+                "answer": rail_response,
+                "thought_process": ["Intent: Conversational Greeting", "Retrieval: Skipped"],
+                "status": "Handled conversationally.",
+                "sources": []
+            }
+
         final_output = rag_agent.invoke(initial_state, config=config)
+
         
         return {
             "question": q,

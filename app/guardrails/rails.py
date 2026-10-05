@@ -6,7 +6,13 @@ from langchain_groq import ChatGroq
 from nemoguardrails import RailsConfig, LLMRails
 
 from app.config import settings
-from app.guardrails.colang_rules import COLANG_CONTENT, YAML_CONTENT, RAIL_INDICATORS
+from app.guardrails.colang_rules import (
+    COLANG_CONTENT,
+    YAML_CONTENT,
+    SAFETY_BLOCKED_INDICATORS,
+    DIALOG_INDICATORS,
+    RAIL_INDICATORS,
+)
 
 
 _rails: LLMRails | None = None
@@ -34,51 +40,63 @@ def initialize_rails() -> None:
     logfire.info(f"🛡️ NeMo Guardrails initialised ({guard_model}).")
 
 
-async def guard_async(message: str) -> tuple[bool, str | None]:
+async def guard_async(message: str) -> tuple[bool, bool, str | None]:
     """
     Asynchronously run a user message through the NeMo rails gate.
+
+    Returns:
+        (is_blocked, is_dialog, content)
+        - (True, False, text) : Safety block (jailbreak / off-topic).
+        - (False, True, text) : Conversational dialog rail (greeting, capabilities, farewell).
+        - (False, False, None): Clean query proceeding to agent graph.
     """
     if _rails is None:
         logfire.warning("⚠️ Guardrails not initialised — skipping gate.")
-        return False, None
+        return False, False, None
 
     with logfire.span("🛡️ Guardrails Check"):
         result = await _rails.generate_async(messages=[{"role": "user", "content": message}])
         content = result.get("content", "") if isinstance(result, dict) else str(result)
-        fired = any(indicator in content for indicator in RAIL_INDICATORS)
 
-        if fired:
-            logfire.info(f"🛡️ Guardrails fired | query='{message[:80]}'")
-            return True, content
+        if any(indicator in content for indicator in SAFETY_BLOCKED_INDICATORS):
+            logfire.info(f"🛡️ Guardrails safety block fired | query='{message[:80]}'")
+            return True, False, content
+
+        if any(indicator in content for indicator in DIALOG_INDICATORS):
+            logfire.info(f"💬 Guardrails dialog flow triggered | query='{message[:80]}'")
+            return False, True, content
 
         logfire.info("✅ Guardrails passed.")
-        return False, None
+        return False, False, None
 
 
-def guard(message: str) -> tuple[bool, str | None]:
+def guard(message: str) -> tuple[bool, bool, str | None]:
     """
     Run a user message through the NeMo rails gate.
 
     Returns:
-        (True,  rail_response) — a rail fired; return this response immediately,
-                                skip the RAG pipeline entirely.
-        (False, None)          — message is clean; proceed to LangGraph.
+        (is_blocked, is_dialog, content)
+        - (True, False, text) : Safety block (jailbreak / off-topic).
+        - (False, True, text) : Conversational dialog rail (greeting, capabilities, farewell).
+        - (False, False, None): Clean query proceeding to agent graph.
     """
     if _rails is None:
         logfire.warning("⚠️ Guardrails not initialised — skipping gate.")
-        return False, None
+        return False, False, None
 
     with logfire.span("🛡️ Guardrails Check"):
         result = _rails.generate(messages=[{"role": "user", "content": message}])
 
-        # NeMo returns {'role': 'assistant', 'content': '...'} — extract text
         content = result.get("content", "") if isinstance(result, dict) else str(result)
 
-        fired = any(indicator in content for indicator in RAIL_INDICATORS)
+        if any(indicator in content for indicator in SAFETY_BLOCKED_INDICATORS):
+            logfire.info(f"🛡️ Guardrails safety block fired | query='{message[:80]}'")
+            return True, False, content
 
-        if fired:
-            logfire.info(f"🛡️ Guardrails fired | query='{message[:80]}'")
-            return True, content
+        if any(indicator in content for indicator in DIALOG_INDICATORS):
+            logfire.info(f"💬 Guardrails dialog flow triggered | query='{message[:80]}'")
+            return False, True, content
 
         logfire.info("✅ Guardrails passed.")
-        return False, None
+        return False, False, None
+

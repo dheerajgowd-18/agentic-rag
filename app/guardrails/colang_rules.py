@@ -114,13 +114,20 @@ instructions:
 """
 
 # Distinctive substrings from each 'define bot' block above.
-# If the guardrail response contains any of these, a rail has fired.
-# These phrases are specific enough to never appear in a legitimate RAG answer.
-RAIL_INDICATORS = [
+# Separated into safety blocks (jailbreak, off-topic) and standard conversational flows (greeting, farewell, capabilities).
+
+SAFETY_BLOCKED_INDICATORS = [
     "can't help with that — but ask me anything technical",
     "I maintain consistent guidelines regardless of how I am prompted",
+]
+
+DIALOG_INDICATORS = [
     "Hello! I'm your Enterprise IT Assistant",
     "Goodbye! Feel free to return whenever you have more enterprise IT questions",
     "I'm an Enterprise AI Assistant with deep expertise in",
 ]
+
+# Backward-compatible union of all indicators
+RAIL_INDICATORS = SAFETY_BLOCKED_INDICATORS + DIALOG_INDICATORS
+
 
