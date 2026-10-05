@@ -1,5 +1,5 @@
 # ==============================================================================
-# ENTERPRISE AGENTIC RAG - REQUIREMENTS (Local, No GCP)
+# ENTERPRISE AGENTIC RAG - REQUIREMENTS (Local & Development)
 # ==============================================================================
 
 # --- CORE API & WEB FRAMEWORK ---
@@ -11,7 +11,7 @@ numpy                       # Numerical processing
 pytz                        # Timezone handling for logs
 nest-asyncio                # Support for nested async loops in async endpoints
 
-# --- GEMINI EMBEDDINGS ---
+# --- GEMINI EMBEDDINGS (OPTIONAL) ---
 google-generativeai         # Gemini API — embeddings (text-embedding-004 / gemini-embedding-001)
 langchain-google-genai      # LangChain integration for Gemini models
 
@@ -22,17 +22,16 @@ flashrank                   # Ultra-fast local cross-encoder for semantic rerank
 # --- LANGCHAIN & AGENTIC ORCHESTRATION ---
 langchain                   # Core LLM orchestration
 langgraph                   # State-machine logic for cyclic agent flows
-langchain-groq              # Integration for lightning-fast Llama 3.3 models
+langchain-groq              # Integration for Groq reasoning models
 langchain-google-vertexai   # Required shim for NeMo Guardrails internal import (no GCP credentials needed)
 langchain-community         # Community-contributed tools and loaders
 langchain-openai            # OpenAI-compatible layer (used by Portkey gateway)
 pydantic>=2.0.0             # Data validation and settings management
 
 # --- DATA INGESTION & DOCUMENT PARSING ---
-unstructured                # Base library for DOCX/PPTX partitioning
 python-pptx                 # Parser for PowerPoint files
 python-docx                 # Parser for Word documents
-pypdf                       # Local PDF text extraction (replaces Document AI)
+pypdf                       # Local PDF text extraction
 beautifulsoup4              # High-speed HTML text extraction
 pdfplumber                  # Fallback PDF parser for scanned/complex layouts
 
@@ -50,11 +49,7 @@ portkey-ai                  # Portkey Gateway for unified LLM routing, fallbacks
 
 # --- EVALUATION (EVALS) ---
 ragas                       # RAG-specific evaluation metrics (Faithfulness, Relevancy, Recall)
-deepeval                    # Pytest-compatible test runner wrapping RAGAS & safety metrics
-langfuse                    # Live production monitoring, tracing & user feedback collection
+pandas                      # Tabular metrics aggregation
 
 # --- EMBEDDINGS (SENTENCE TRANSFORMERS) ---
-sentence-transformers       # Used by FlashRank reranker internally
-langchain_google_genai
-
-langchain-google-vertexai
+sentence-transformers       # Local MiniLM embeddings and cross-encoder support
