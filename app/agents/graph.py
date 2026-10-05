@@ -42,12 +42,30 @@ workflow.add_edge("retriever", "responder")
 workflow.add_edge("responder", END)
 
 
-# --- MEMORY UPGRADE ---
-# MemorySaver allows the agent to remember conversations based on 'thread_id'
-checkpointer = MemorySaver()
+# --- CHECKPOINT PERSISTENCE ---
+# Supports configurable SQLite persistence or standard in-memory MemorySaver
+def _build_checkpointer():
+    persistence_mode = getattr(settings, "CHECKPOINT_PERSISTENCE", "memory")
+    db_path = getattr(settings, "CHECKPOINT_DB_PATH", "checkpoints.sqlite")
+
+    if persistence_mode in ("sqlite", "disk"):
+        try:
+            import sqlite3
+            from langgraph.checkpoint.sqlite import SqliteSaver
+            conn = sqlite3.connect(db_path, check_same_thread=False)
+            return SqliteSaver(conn)
+        except Exception as e:
+            # Fall back gracefully if sqlite extension or setup is unavailable
+            return MemorySaver()
+
+    return MemorySaver()
+
+
+checkpointer = _build_checkpointer()
 
 
 # 4. Compile the Graph with Memory
 rag_agent = workflow.compile(checkpointer=checkpointer)
+
 
 
