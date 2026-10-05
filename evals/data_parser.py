@@ -16,8 +16,10 @@ from app.ingestion.loaders.text import parse_text
 from app.ingestion.loaders.html import parse_html
 from app.ingestion.chunking.splitter import chunk_text
 
-TRUE_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "true_data")
-NOISY_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "noisy_data")
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_data_base = os.path.join(REPO_ROOT, "DATA") if os.path.isdir(os.path.join(REPO_ROOT, "DATA")) else os.path.join(REPO_ROOT, "data")
+TRUE_DATA_DIR = os.path.join(_data_base, "true_data")
+NOISY_DATA_DIR = os.path.join(_data_base, "noisy_data")
 NOISY_ALLOWED_EXTS = {".pptx", ".docx", ".txt"}
 
 
@@ -59,25 +61,27 @@ def load_all_chunks() -> list[dict]:
     """
     results = []
 
-    for fname in sorted(os.listdir(TRUE_DATA_DIR)):
-        fpath = os.path.join(TRUE_DATA_DIR, fname)
-        if not os.path.isfile(fpath):
-            continue
-        text = parse_file(fpath)
-        if text:
-            for chunk in chunk_text(text):
-                results.append({"text": chunk, "source": fname, "is_noise": False})
+    if os.path.isdir(TRUE_DATA_DIR):
+        for fname in sorted(os.listdir(TRUE_DATA_DIR)):
+            fpath = os.path.join(TRUE_DATA_DIR, fname)
+            if not os.path.isfile(fpath):
+                continue
+            text = parse_file(fpath)
+            if text:
+                for chunk in chunk_text(text):
+                    results.append({"text": chunk, "source": fname, "is_noise": False})
 
-    for fname in sorted(os.listdir(NOISY_DATA_DIR)):
-        ext = os.path.splitext(fname)[1].lower()
-        if ext not in NOISY_ALLOWED_EXTS:
-            continue
-        fpath = os.path.join(NOISY_DATA_DIR, fname)
-        if not os.path.isfile(fpath):
-            continue
-        text = parse_file(fpath)
-        if text:
-            for chunk in chunk_text(text):
-                results.append({"text": chunk, "source": fname, "is_noise": True})
+    if os.path.isdir(NOISY_DATA_DIR):
+        for fname in sorted(os.listdir(NOISY_DATA_DIR)):
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in NOISY_ALLOWED_EXTS:
+                continue
+            fpath = os.path.join(NOISY_DATA_DIR, fname)
+            if not os.path.isfile(fpath):
+                continue
+            text = parse_file(fpath)
+            if text:
+                for chunk in chunk_text(text):
+                    results.append({"text": chunk, "source": fname, "is_noise": True})
 
     return results
