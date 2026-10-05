@@ -13,7 +13,7 @@ A production-grade, enterprise-level RAG system built with **LangGraph**, **Port
 - **Local Embeddings**: Local `all-MiniLM-L6-v2` (384-dim) embeddings via `sentence-transformers` for zero rate limits, with optional Gemini embeddings support.
 - **Robust Local Document Parsing**: Native PDF (`pypdf`), DOCX (`python-docx`), PPTX (`python-pptx`), HTML, and TXT parsing without external OCR or Office dependencies.
 - **Observability**: Full trace nesting with **Pydantic Logfire** and **LangSmith** across every node.
-- **Evaluation Suite**: RAGAS-powered eval pipeline with dedicated evaluation app in `evals/app.py`.
+- **Evaluation Suite**: RAGAS-powered eval pipeline with dedicated CLI test runner in `evals/run_evals.py`.
 
 ---
 
@@ -30,8 +30,8 @@ graph TD
     Planner -->|Technical Query| Retriever[Qdrant Retriever]
     Retriever --> Reranker[FlashRank Cross-Encoder]
     Reranker --> Responder
-    Responder -->|SSE Tokens & Thoughts| UI
-    Responder -.-> Memory[(LangGraph Checkpointer)]
+    Responder -->|SSE Tokens & Citations| UI
+    Responder -.-> Memory[(SQLite / LangGraph Checkpointer)]
 ```
 
 ---
@@ -45,21 +45,22 @@ graph TD
 │   ├── gateway/         # Portkey LLM gateway — routing, retries, and fallback
 │   ├── guardrails/      # NeMo Guardrails input/output filtering (async & sync)
 │   ├── ingestion/
-│   │   ├── chunking/    # Paragraph-based text splitter (1500 char max)
+│   │   ├── chunking/    # Recursive sentence-aware text splitter (1000 char max, 150 overlap)
 │   │   └── loaders/     # Local parsers — PDF, HTML, TXT, DOCX, PPTX
 │   ├── services/
 │   │   └── retrieval/   # Local/Gemini embeddings + Qdrant search + FlashRank reranking
 │   ├── static/          # Bespoke HTML/CSS/JS frontend
-│   │   ├── css/style.css# Minimalist dark theme, animations, responsive design
-│   │   ├── js/app.js    # SSE stream reader, AbortController stop button, markdown
+│   │   ├── css/style.css# Minimalist dark theme, citation tags, inspector drawer
+│   │   ├── js/app.js    # SSE stream reader, AbortController stop button, source viewer
 │   │   └── index.html   # Single-page Agent OS UI
 │   ├── config.py        # Centralized environment variable management
 │   └── main.py          # FastAPI entrypoint — SSE streaming + memory reset + static UI
 ├── evals/               # RAGAS evaluation suite + CLI runner (run_evals.py)
 ├── processed_data/      # Parsed & chunked JSON metadata per document
-├── docs/                # Architectural and operational guides (11 docs)
 ├── DATA/                # Documentation datasets (true_data vs noisy_data)
-└── requirements.txt     # Pinned dependencies
+├── ARCHITECTURE.md      # Detailed system architecture and flow diagrams
+├── commands.md          # Execution, ingestion, and evaluation command reference
+└── requirements.txt     # Clean development dependencies
 ```
 
 ---

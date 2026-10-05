@@ -13,7 +13,7 @@ graph LR
     %% ── API + Safety ─────────────────────────────────────────────────────────
     subgraph SAFETY ["🛡️  API + Safety"]
         direction TB
-        API["⚡ FastAPI\n/query"]
+        API["⚡ FastAPI\n/query + /query/stream"]
         GR{"NeMo\nGuardrails"}
     end
 
@@ -21,24 +21,24 @@ graph LR
     subgraph AGENT ["🧠  LangGraph Agentic Core"]
         direction TB
         PL["🗺️ Planner\nIntent Classification"]
-        RT["🔍 Retriever\nVector Search"]
-        RS["💬 Responder\nAnswer Generation"]
-        MEM[("💾 MemorySaver\nConversation History")]
+        RT["🔍 Retriever\nVector Search & Threshold"]
+        RS["💬 Responder\nAnswer & Citation Generation"]
+        MEM[("💾 SQLite / MemorySaver\nConversation History")]
     end
 
     %% ── Retrieval ────────────────────────────────────────────────────────────
     subgraph RETRIEVAL ["🔎  Retrieval Layer"]
         direction TB
         QD[("🗄️ Qdrant Cloud\nVector DB")]
-        FR["⚡ FlashRank\nLocal Reranker"]
+        FR["⚡ FlashRank\nLocal Cross-Encoder & Metadata Preserved"]
     end
 
     %% ── LLM Gateway ──────────────────────────────────────────────────────────
     subgraph GATEWAY ["🌐  LLM Gateway"]
         direction TB
         PK["🔀 Portkey\nUnified Gateway"]
-        G1["🦙 Groq Primary\nLlama 3.3 · 70B"]
-        G2["🦙 Groq Fallback\nLlama 3.1 · 8B"]
+        G1["🧠 Primary Model\nopenai/gpt-oss-120b"]
+        G2["⚡ Fallback Model\nopenai/gpt-oss-20b"]
     end
 
     %% ── Ingestion ────────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ graph LR
         direction TB
         LOADER["Document Loaders\nPDF · HTML · DOCX · PPTX · TXT"]
         PARSED[("📁 processed_data/\nLocal JSON Chunks")]
-        EMB["🔢 Gemini Embeddings\ngemini-embedding-2-preview · 3072-dim"]
+        EMB["🔢 Embeddings\nall-MiniLM-L6-v2 (Local) / Gemini"]
     end
 
     %% ── Observability ────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ graph LR
     EMB --> QD
 
     %% ── Eval Flow ────────────────────────────────────────────────────────────
-    EVAL_UI -->|phase 1| API
+    CLI_EVAL -->|phase 1| API
     GD --> RAGAS
     GD --> TC
     RAGAS --> JUDGE
@@ -108,7 +108,7 @@ graph LR
     classDef evals     fill:#EC4899,stroke:#BE185D,color:#fff,rx:8
     classDef memory    fill:#7C3AED,stroke:#5B21B6,color:#fff,rx:8
 
-    class CHAT,EVAL_UI ui
+    class CHAT,CLI_EVAL ui
     class API,GR safety
     class PL,RT,RS agent
     class QD,FR retrieval
@@ -134,32 +134,32 @@ graph TB
 
     subgraph SAFETY ["2. API + Safety Gate"]
         direction LR
-        API["⚡ FastAPI  /query"]
+        API["⚡ FastAPI  /query & /query/stream"]
         GR{"🛡️ NeMo Guardrails\nBlocks · Jailbreak · Off-topic · Injection"}
     end
 
     subgraph AGENT ["3. Agent Engine  —  LangGraph"]
         direction LR
         PL["🗺️ Planner Node\nIntent Classification"]
-        RT["🔍 Retriever Node\nVector Search"]
-        RS["💬 Responder Node\nAnswer Generation"]
-        MEM[("💾 MemorySaver\nConversation History")]
+        RT["🔍 Retriever Node\nVector Search & Score Filtering"]
+        RS["💬 Responder Node\nAnswer Synthesis & In-Text Citations"]
+        MEM[("💾 Persistent SQLite / MemorySaver\nConversation History")]
     end
 
     subgraph KNOWLEDGE ["4. Knowledge & LLMs"]
         direction LR
         QD[("🗄️ Qdrant Cloud\nVector DB")]
-        FR["⚡ FlashRank\nLocal Reranker"]
-        PK["🔀 Portkey Gateway\nRouting + Fallback"]
-        G1["🦙 Groq Primary\nLlama 3.3 · 70B"]
-        G2["🦙 Groq Fallback\nLlama 3.1 · 8B"]
+        FR["⚡ FlashRank\nLocal Cross-Encoder & Metadata Preserved"]
+        PK["🔀 Portkey Gateway\nRouting + Programmatic Fallback"]
+        G1["🧠 Primary Model\nopenai/gpt-oss-120b"]
+        G2["⚡ Fallback Model\nopenai/gpt-oss-20b"]
     end
 
     subgraph INGEST ["5. Data Ingestion"]
         direction LR
         LOAD["Document Loaders\nPDF · HTML · DOCX · PPTX · TXT"]
         PROC[("📁 processed_data/\nLocal JSON Chunks")]
-        EMB["🔢 Gemini Embeddings\ngemini-embedding-2-preview · 3072-dim"]
+        EMB["🔢 Embeddings\nall-MiniLM-L6-v2 (Local) / Gemini"]
     end
 
     subgraph EVALS ["6. Evaluation Suite  —  RAGAS"]
@@ -167,7 +167,7 @@ graph TB
         GD[("📋 Golden Dataset\n15 RAG Samples · 6 Guardrail Tests")]
         RAGAS["RAGAS Metrics\nFaithfulness · Relevancy · Precision\nRecall · Correctness"]
         TC["Tool Correctness\nJaccard · Zero LLM Cost"]
-        JG["⚖️ Judge LLM\nGroq · Separate Key"]
+        JG["⚖️ Judge LLM\nGroq · JUDGE_GROQ Key"]
     end
 
     subgraph OBS ["7. Monitoring & Observability"]
@@ -178,7 +178,7 @@ graph TB
 
     %% ── Query Flow ───────────────────────────────────────────────────────────
     CHAT -->|user query| API
-    EAPP -->|phase 1 query| API
+    CLI_EVAL -->|phase 1 query| API
     API --> GR
     GR -->|"❌ blocked"| CHAT
     GR -->|"✅ pass"| PL
@@ -218,7 +218,7 @@ graph TB
     classDef obs       fill:#0D9488,stroke:#0F766E,color:#fff
     classDef memory    fill:#6D28D9,stroke:#4C1D95,color:#fff
 
-    class CHAT,EAPP ui
+    class CHAT,CLI_EVAL ui
     class API,GR safety
     class PL,RT,RS agent
     class QD,FR,PK,G1,G2 knowledge
@@ -237,9 +237,9 @@ graph TB
     A["🖥️ 1. Web App (HTML/CSS/JS) + CLI Evals"]
     B["⚡ 2. FastAPI + 🛡️ NeMo Guardrails"]
     C["🧠 3. LangGraph Agent\nPlanner → Retriever → Responder"]
-    D["🗄️ 4. Qdrant Cloud\n+ FlashRank Reranker"]
-    E["🌐 5. Portkey Gateway\nGroq Llama 3.3 70B · Fallback 8B"]
-    F["📥 6. Data Ingestion\nLocal Parsers · Gemini Embeddings · processed_data/"]
+    D["🗄️ 4. Qdrant Cloud\n+ FlashRank Reranker (Metadata Preserved)"]
+    E["🌐 5. Portkey Gateway\ngpt-oss-120b · Fallback gpt-oss-20b"]
+    F["📥 6. Data Ingestion\nSentence-Aware Chunker · MiniLM / Gemini · processed_data/"]
     G["🧪 7. RAGAS Evals\nFaithfulness · Precision · Recall · Correctness"]
     H["📡 8. Monitoring\nLogfire · LangSmith"]
 
