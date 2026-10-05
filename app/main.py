@@ -243,11 +243,12 @@ def clear_memory(request: ClearMemoryRequest):
     """
     try:
         config = {"configurable": {"thread_id": request.thread_id}}
-        rag_agent.update_state(config, {"messages": []})
+        rag_agent.update_state(config, {"messages": [{"role": "system", "content": "__CLEAR__"}]})
         logfire.info(f"🗑️ Cleared memory for thread: {request.thread_id}")
         return {"status": "cleared", "thread_id": request.thread_id}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 
 # ── Legacy Synchronous Endpoint ──────────────────────────────────────────────
