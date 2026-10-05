@@ -23,14 +23,11 @@ def _get_ranker() -> Ranker:
 
 
 
-def rerank_documents(query: str, documents: list[str], top_n: int = 5) -> list[str]:
+def rerank_documents(query: str, documents: list, top_n: int = 5) -> list:
     """
     Refines retrieval results by re-scoring documents against the query semantically.
-    
-    Why FlashRank? 
-    Standard vector search (Cosine Similarity) is fast but mathematically "fuzzy."
-    FlashRank uses a Cross-Encoder approach which is much more precise but usually slow.
-    FlashRank solves this by using highly optimized, quantized ONNX models locally.
+    Supports either list of dicts (with 'content', 'source', etc.) or list of strings.
+    Always returns items with full metadata preserved if dicts are provided.
     """
     if not documents:
         return []
@@ -40,28 +37,37 @@ def rerank_documents(query: str, documents: list[str], top_n: int = 5) -> list[s
 
     try:
         ranker = _get_ranker()
-        
-        # FlashRank expects a list of dictionaries with 'id' and 'text'
-        passages = [
-            {"id": i, "text": doc}
-            for i, doc in enumerate(documents)
-        ]
+
+        # Build passages for FlashRank with original index
+        passages = []
+        is_dict = isinstance(documents[0], dict)
+        for i, doc in enumerate(documents):
+            text = doc.get("content", "") if is_dict else str(doc)
+            passages.append({"id": i, "text": text})
 
         request = RerankRequest(query=query, passages=passages)
         results = ranker.rerank(request)
-        
-        # Results are returned sorted by highest semantic score first
+
+        # Map back to original document items with updated scores
         reranked_docs = []
         for res in results[:top_n]:
-            reranked_docs.append(res['text'])
+            orig_idx = int(res["id"])
+            orig_doc = documents[orig_idx]
+            if is_dict:
+                updated_doc = dict(orig_doc)
+                updated_doc["score"] = res.get("score")
+                reranked_docs.append(updated_doc)
+            else:
+                reranked_docs.append(res["text"])
 
         duration = time.time() - start_time
-        top_score = results[0]['score'] if results else 'N/A'
+        top_score = results[0]["score"] if results else "N/A"
         logfire.info(f"✅ [Reranker] Done in {duration:.2f}s. Top semantic score: {top_score}")
-        
+
         return reranked_docs
 
     except Exception as e:
         logfire.error(f"❌ [Reranker] Semantic Reranking Failed: {e}")
-        # Fallback to the original Qdrant order to ensure the user still gets an answer
+        # Fallback to the original order to ensure the user still gets an answer
         return documents[:top_n]
+
