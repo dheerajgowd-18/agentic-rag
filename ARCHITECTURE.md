@@ -21,8 +21,11 @@ graph LR
     subgraph AGENT ["🧠  LangGraph Agentic Core"]
         direction TB
         PL["🗺️ Planner\nIntent Classification"]
-        RT["🔍 Retriever\nVector Search & Threshold"]
-        RS["💬 Responder\nAnswer & Citation Generation"]
+        RT["🔍 Retriever\nVector Search & Typed Outcomes"]
+        CG{"⚖️ Context Grader\nEvidence Assessment"}
+        QR["🔄 Query Rewriter\nBounded Refinement (Max 1)"]
+        RS["💬 Responder\nAnswer Generation"]
+        CV{"🔍 Citation Validator\nReference Grounding [N]"}
         MEM[("💾 SQLite / MemorySaver\nConversation History")]
     end
 

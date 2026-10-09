@@ -1,19 +1,23 @@
 # Enterprise Agentic RAG (Scalable Pipeline)
 
-A production-grade, enterprise-level RAG system built with **LangGraph**, **Portkey LLM Gateway**, **Local SentenceTransformers & Qdrant Cloud**, and a **Bespoke Minimalist HTML/CSS/JS Frontend**. The system distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
+A production-grade, enterprise-level RAG system built with **LangGraph**, **Portkey LLM Gateway**, **SentenceTransformers & Qdrant Cloud**, and a **Bespoke Minimalist HTML/CSS/JS Frontend**. The system distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, bounded retrieval refinement, citation validation, and NeMo Guardrails for input/output safety.
 
 ## Key Features
 
 - **Bespoke Minimalist Frontend**: Custom HTML/CSS/JS UI (served directly at `http://localhost:8000`) with smooth transitions, Agent OS sidebar, session memory ID, live thought process reasoning accordions, sources context drawer, and an instant **Stop Response** button.
-- **Agentic Intelligence**: LangGraph for cyclic reasoning, multi-step planning, and conversational thread memory.
+- **Agentic Workflow**: LangGraph cyclic graph featuring:
+  - Structured, validated **Planner** distinguishing greetings, memory, and technical inquiries.
+  - **Retriever** with explicit typed outcomes (distinguishing no-match from vector DB outages, auth failures, or config mismatches).
+  - **Context Grader & Query Rewriter**: Bounded retrieval refinement (max 1 retry) for queries with insufficient initial context.
+  - **Deterministic Citation Validation**: Validates all generated `[N]` bracketed references against retrieved documents, sanitizing hallucinated references.
 - **Next-Gen Models**: Primary reasoning powered by `openai/gpt-oss-120b` via Portkey Gateway; NeMo Guardrails and evaluation judging powered by `openai/gpt-oss-20b`.
-- **Guardrails Gate**: NeMo Guardrails safety layer blocks off-topic, jailbreak, and injection inputs before retrieval.
+- **Fail-Closed Guardrails**: NeMo Guardrails safety layer blocks off-topic, jailbreak, and prompt injections before retrieval under a deliberate fail-closed policy.
 - **LLM Gateway**: Portkey routes all LLM calls with automatic retry, latency tracking, and fallback.
-- **Enterprise Search**: Qdrant Cloud for vector search + FlashRank cross-encoder for local semantic reranking.
-- **Local Embeddings**: Local `all-MiniLM-L6-v2` (384-dim) embeddings via `sentence-transformers` for zero rate limits, with optional Gemini embeddings support.
-- **Robust Local Document Parsing**: Native PDF (`pypdf`), DOCX (`python-docx`), PPTX (`python-pptx`), HTML, and TXT parsing without external OCR or Office dependencies.
+- **Enterprise Search**: Qdrant Cloud for vector search + FlashRank cross-encoder for local semantic reranking with observable degradation fallback.
+- **Thread-Safe Embeddings**: Local `all-MiniLM-L6-v2` (384-dim, default) via `sentence-transformers` for zero rate limits, with validated optional Gemini embeddings support.
+- **Office & PDF Ingestion**: Native PDF (`pypdf`), DOCX (`python-docx`), PPTX (`python-pptx`, with table parsing), HTML, and TXT parsing with comprehensive `IngestionReport`.
 - **Observability**: Full trace nesting with **Pydantic Logfire** and **LangSmith** across every node.
-- **Evaluation Suite**: RAGAS-powered eval pipeline with dedicated CLI test runner in `evals/run_evals.py`.
+- **Evaluation Suite**: RAGAS evaluation pipeline with isolated thread IDs, string context normalization, Jaccard tool correctness, and CLI runner.
 
 ---
 
@@ -24,43 +28,18 @@ graph TD
     User((User)) --> UI[Modern HTML/CSS/JS UI]
     UI -->|SSE Stream /query/stream| API[FastAPI Gateway]
     API --> Guard{NeMo Guardrails Gate}
-    Guard -->|Blocked| UI
+    Guard -->|Blocked / Error| UI
     Guard -->|Pass| Planner{Planner Node}
     Planner -->|Conversational| Responder[Synthesis Node]
     Planner -->|Technical Query| Retriever[Qdrant Retriever]
-    Retriever --> Reranker[FlashRank Cross-Encoder]
+    Retriever --> Grader{Context Grader}
+    Grader -->|Sufficient Docs| Reranker[FlashRank Cross-Encoder]
+    Grader -->|Insufficient Docs & Retry < 1| Rewriter[Query Rewriter]
+    Rewriter --> Retriever
     Reranker --> Responder
-    Responder -->|SSE Tokens & Citations| UI
-    Responder -.-> Memory[(SQLite / LangGraph Checkpointer)]
-```
-
----
-
-## Project Structure
-
-```text
-├── app/
-│   ├── agents/
-│   │   └── nodes/       # Planner, Retriever, Responder LangGraph nodes
-│   ├── gateway/         # Portkey LLM gateway — routing, retries, and fallback
-│   ├── guardrails/      # NeMo Guardrails input/output filtering (async & sync)
-│   ├── ingestion/
-│   │   ├── chunking/    # Recursive sentence-aware text splitter (1000 char max, 150 overlap)
-│   │   └── loaders/     # Local parsers — PDF, HTML, TXT, DOCX, PPTX
-│   ├── services/
-│   │   └── retrieval/   # Local/Gemini embeddings + Qdrant search + FlashRank reranking
-│   ├── static/          # Bespoke HTML/CSS/JS frontend
-│   │   ├── css/style.css# Minimalist dark theme, citation tags, inspector drawer
-│   │   ├── js/app.js    # SSE stream reader, AbortController stop button, source viewer
-│   │   └── index.html   # Single-page Agent OS UI
-│   ├── config.py        # Centralized environment variable management
-│   └── main.py          # FastAPI entrypoint — SSE streaming + memory reset + static UI
-├── evals/               # RAGAS evaluation suite + CLI runner (run_evals.py)
-├── processed_data/      # Parsed & chunked JSON metadata per document
-├── DATA/                # Documentation datasets (true_data vs noisy_data)
-├── ARCHITECTURE.md      # Detailed system architecture and flow diagrams
-├── commands.md          # Execution, ingestion, and evaluation command reference
-└── requirements.txt     # Clean development dependencies
+    Responder --> Validator{Citation Validator}
+    Validator -->|Validated Tokens & Citations| UI
+    Responder -.-> Memory[(SQLite / In-Memory Checkpointer)]
 ```
 
 ---
@@ -70,15 +49,16 @@ graph TD
 | Layer | Technology |
 |-------|-----------|
 | User Interface | Bespoke HTML5 / CSS3 / Vanilla JS (Minimalist Dark UI, SSE, AbortController) |
-| Orchestration | LangChain + LangGraph |
+| Orchestration | LangChain + LangGraph (with bounded context refinement) |
 | Primary LLM | `openai/gpt-oss-120b` (Groq via **Portkey** gateway) |
 | Guardrails & Judge | `openai/gpt-oss-20b` (Groq / NeMo Guardrails) |
 | Vector DB | Qdrant Cloud |
-| Reranking | FlashRank (local TinyBERT cross-encoder) |
+| Reranking | FlashRank (local TinyBERT cross-encoder with observable fallback) |
 | Embeddings | Local `all-MiniLM-L6-v2` (384-dim, default) / Gemini (`gemini-embedding-2-preview`) |
-| Document Parsing | `pypdf`, `python-docx`, `python-pptx`, `beautifulsoup4` |
+| Citation Grounding | Deterministic citation extractor & validator (`validate_citations`) |
+| Document Parsing | `pypdf`, `python-docx` (paragraphs + tables), `python-pptx` (tables), `beautifulsoup4` |
 | Observability | Pydantic Logfire + LangSmith |
-| Evaluation | RAGAS + custom Tool Correctness (Jaccard) |
+| Evaluation | RAGAS + Workflow Routing Correctness (Jaccard) |
 
 ---
 
@@ -87,8 +67,8 @@ graph TD
 ### 1. Install dependencies
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -99,46 +79,30 @@ Copy the sample environment file:
 copy .env.example .env
 ```
 
-Fill in your API keys in `.env`:
-```env
-# Groq & Reasoning Models
-GROQ_API_KEY = "gsk_..."
-GROQ_MODEL = "openai/gpt-oss-120b"
-GROQ_GUARD_MODEL = "openai/gpt-oss-20b"
+Ensure the required keys are populated in `.env`:
+- `GROQ_API_KEY`
+- `PORTKEY_API_KEY`
+- `QDRANT_API_KEY` & `QDRANT_CLUSTER_ENDPOINT`
 
-# Portkey Gateway
-PORTKEY_API_KEY = "pk-..."
-PORTKEY_GROQ_SLUG = "rag"
+### 3. Run automated tests
 
-# Embeddings (local SentenceTransformers avoids API rate limits)
-EMBEDDING_PROVIDER = "local"
-LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-
-# Qdrant Cloud Cluster
-QDRANT_API_KEY = "..."
-QDRANT_CLUSTER_ENDPOINT = "https://your-cluster-id.region.gcp.cloud.qdrant.io:6333"
-
-# Observability
-LOGFIRE_TOKEN = "..."
-LANGSMITH_TRACING = true
-LANGSMITH_ENDPOINT = "https://api.smith.langchain.com"
-LANGSMITH_API_KEY = "..."
-LANGSMITH_PROJECT = "rag_scale_test"
-
-BACKEND_URL = "http://localhost:8000"
-```
-
-### 3. Run data ingestion
-
-Parses all documents in `DATA/true_data`, chunks them, saves metadata to `processed_data/`, and indexes vectors into Qdrant.
+Run the complete test suite (unit and integration tests with mocked external services):
 
 ```powershell
-python -m app.ingestion.processor DATA/true_data --wipe
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
-> Pass `--wipe` to drop and recreate the Qdrant collection.
+### 4. Run data ingestion
 
-### 4. Launch the application
+Parses all documents in `DATA/true_data`, chunks them, saves metadata to `processed_data/`, and indexes vectors into Qdrant. Generates a structured `IngestionReport`.
+
+```powershell
+python -m app.ingestion.processor DATA/true_data
+```
+
+> Note: To wipe and recreate the collection from scratch, explicitly pass `--wipe`. Never run with `--wipe` against production collections without confirmation.
+
+### 5. Launch the application
 
 Launch the unified FastAPI server:
 
@@ -149,7 +113,13 @@ uvicorn app.main:app --reload --port 8000
 Open your browser at:
 👉 **`http://localhost:8000`**
 
-### 5. Run the eval suite (optional)
+- **Health check**: `GET /api/health`
+- **Readiness check**: `GET /api/ready`
+- **Streaming query**: `POST /query/stream`
+- **Synchronous query**: `POST /query`
+- **Clear memory**: `POST /memory/clear`
+
+### 6. Run the evaluation suite
 
 ```powershell
 python -m evals.run_evals --mode all
@@ -157,4 +127,4 @@ python -m evals.run_evals --mode all
 
 ---
 
-*Built for High-Scale Enterprise Document Intelligence.*
+*Enterprise Agentic RAG System.*
