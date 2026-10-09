@@ -3,191 +3,235 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Enterprise Agentic Assistant</title>
+  <meta name="description" content="Agentic RAG — Enterprise Document Intelligence & Research Workspace">
+  <title>Agentic RAG — AI Research Workspace</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+  <!-- Off-canvas backdrop for mobile sidebar -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
   <div class="app-layout">
-    <!-- Sidebar / Drawer -->
-    <aside class="sidebar" id="sidebar">
+    <!-- Compact, Quiet Sidebar -->
+    <aside class="sidebar" id="sidebar" aria-label="Workspace Navigation">
       <div class="sidebar-header">
         <div class="brand">
-          <div class="brand-logo">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          <div class="brand-monogram" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <path d="M7 8h10"></path>
+              <path d="M7 12h10"></path>
+              <path d="M7 16h6"></path>
             </svg>
           </div>
-          <div>
-            <div class="brand-title">Agent OS</div>
-            <div class="brand-subtitle">Enterprise RAG</div>
+          <div class="brand-text">
+            <div class="brand-title">Agentic RAG</div>
+            <div class="brand-subtitle">Research Workspace</div>
           </div>
         </div>
-        <button class="mobile-close-btn" id="mobileCloseBtn" aria-label="Close sidebar">
+        <button class="icon-btn mobile-close-btn" id="mobileCloseBtn" aria-label="Close navigation sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
 
       <div class="sidebar-content">
-        <!-- Live System Status -->
-        <div class="panel-section">
-          <div class="section-label">Observability & Core</div>
-          <div class="status-card">
-            <div class="status-row">
-              <span class="status-indicator live-pulse"></span>
-              <span class="status-name">Logfire</span>
-              <span class="status-val success">Connected &amp; Tracing</span>
-            </div>
-            <div class="status-row">
-              <span class="status-bullet"></span>
-              <span class="status-name">Reasoning Model</span>
-              <span class="status-val mono" id="modelBadge">openai/gpt-oss-120b</span>
-            </div>
-            <div class="status-row">
-              <span class="status-bullet"></span>
-              <span class="status-name">Embeddings</span>
-              <span class="status-val mono">all-MiniLM-L6-v2 (Local)</span>
-            </div>
-            <div class="status-row">
-              <span class="status-bullet"></span>
-              <span class="status-name">Vector DB</span>
-              <span class="status-val mono">Qdrant Cloud</span>
-            </div>
-          </div>
-        </div>
-
         <!-- Session Memory Management -->
-        <div class="panel-section">
-          <div class="section-label">Session Memory</div>
-          <div class="memory-card">
-            <div class="memory-info">
-              <span class="memory-label">Memory ID:</span>
-              <span class="memory-id mono" id="memoryIdDisplay">--------</span>
-              <button class="icon-btn" id="copyMemoryIdBtn" title="Copy Memory ID">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              </button>
+        <section class="panel-section" aria-labelledby="sessionMemoryLabel">
+          <div class="section-label" id="sessionMemoryLabel">Active Session</div>
+          <div class="session-card">
+            <div class="session-row">
+              <span class="session-key">Thread ID</span>
+              <div class="session-val-group">
+                <code class="session-id mono" id="memoryIdDisplay">--------</code>
+                <button class="icon-btn-compact" id="copyMemoryIdBtn" aria-label="Copy session ID to clipboard" title="Copy Thread ID">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+              </div>
             </div>
-            <button class="btn btn-danger-soft" id="clearMemoryBtn">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              Clear History &amp; Memory
+            <button class="btn btn-secondary-danger" id="clearMemoryBtn" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span>Reset Session Memory</span>
             </button>
           </div>
-        </div>
+        </section>
 
-        <!-- Suggested Technical Prompts -->
-        <div class="panel-section flex-grow">
-          <div class="section-label">Suggested Inquiries</div>
-          <div class="suggestions-list">
-            <button class="suggestion-item" data-prompt="How do you start Redis for a Kubernetes work queue?">
-              <span>How do you start Redis for a Kubernetes work queue?</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+        <!-- System Architecture & Telemetry -->
+        <section class="panel-section" aria-labelledby="telemetryLabel">
+          <div class="section-label" id="telemetryLabel">Workspace Architecture</div>
+          <div class="telemetry-card">
+            <div class="telemetry-row">
+              <span class="telemetry-name">Service Status</span>
+              <span class="telemetry-status-pill success">
+                <span class="status-indicator"></span>
+                <span id="serviceStatusText">Online</span>
+              </span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-name">Model</span>
+              <span class="telemetry-val mono" id="modelBadge">Groq / gpt-oss-120b</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-name">Vector Index</span>
+              <span class="telemetry-val mono">Qdrant Cloud</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-name">Reranker</span>
+              <span class="telemetry-val mono">FlashRank CE</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="telemetry-name">Guardrails</span>
+              <span class="telemetry-val mono">NeMo Active</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Suggested Inquiry Library -->
+        <section class="panel-section flex-grow" aria-labelledby="inquiriesLabel">
+          <div class="section-label" id="inquiriesLabel">Grounded Inquiries</div>
+          <div class="suggestions-list" role="list">
+            <button class="suggestion-item" data-prompt="How do you start Redis for a Kubernetes work queue?" type="button">
+              <span class="suggestion-text">Redis work queue deployment in K8s</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
             </button>
-            <button class="suggestion-item" data-prompt="What is the difference between HPA and VPA in Kubernetes?">
-              <span>Difference between HPA and VPA autoscaling</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            <button class="suggestion-item" data-prompt="What is the difference between HPA and VPA in Kubernetes?" type="button">
+              <span class="suggestion-text">HPA vs VPA autoscaling comparison</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
             </button>
-            <button class="suggestion-item" data-prompt="What are the completions and parallelism fields in a Kubernetes Job spec?">
-              <span>Completions &amp; parallelism in Kubernetes Jobs</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            <button class="suggestion-item" data-prompt="What are the completions and parallelism fields in a Kubernetes Job spec?" type="button">
+              <span class="suggestion-text">Completions &amp; parallelism in Jobs</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
             </button>
-            <button class="suggestion-item" data-prompt="What Databricks CLI command retrieves details of a specific job?">
-              <span>Managing Databricks jobs via CLI &amp; API</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            <button class="suggestion-item" data-prompt="What Databricks CLI command retrieves details of a specific job?" type="button">
+              <span class="suggestion-text">Databricks job commands via CLI</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
             </button>
           </div>
-        </div>
+        </section>
       </div>
 
       <div class="sidebar-footer">
-        <span class="footer-note">Grounded on Enterprise Knowledge Base</span>
+        <span class="footer-note">✦ Document-Grounded Synthesis</span>
       </div>
     </aside>
 
-    <!-- Main Chat View -->
-    <main class="main-content">
+    <!-- Primary Chat View -->
+    <main class="main-content" role="main">
       <header class="topbar">
         <div class="topbar-left">
-          <button class="mobile-toggle-btn" id="mobileToggleBtn" aria-label="Open sidebar">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <button class="mobile-toggle-btn" id="mobileToggleBtn" aria-label="Open navigation sidebar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
-          <div class="chat-title-group">
-            <h1 class="chat-title">Enterprise Agentic Assistant</h1>
-            <span class="chat-badge">GPT-OSS-120B · FlashRank</span>
+          <button class="desktop-toggle-btn" id="desktopToggleBtn" aria-label="Toggle navigation sidebar" title="Toggle Sidebar (Ctrl+B)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+          </button>
+          <div class="workspace-identity">
+            <span class="workspace-name">Agentic RAG</span>
+            <span class="workspace-sep">/</span>
+            <span class="workspace-doc-badge">Verified Synthesis</span>
           </div>
         </div>
         <div class="topbar-right">
-          <div class="system-status-chip">
-            <span class="chip-dot"></span>
-            <span>Online</span>
+          <button class="topbar-inspector-btn" id="topbarInspectorBtn" aria-label="Toggle Source Inspector" title="Toggle Source Inspector">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Sources</span>
+            <span class="sources-count-badge" id="topbarSourceCount">0</span>
+          </button>
+          <div class="topbar-status-chip" id="topbarStatusChip">
+            <span class="chip-dot" id="topbarChipDot"></span>
+            <span id="topbarStatusText">Ready</span>
           </div>
         </div>
       </header>
 
-      <!-- Messages Thread -->
-      <div class="messages-container" id="messagesContainer">
-        <!-- Hero screen shown when thread is empty -->
-        <div class="hero-welcome" id="heroWelcome">
-          <div class="hero-icon">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-              <line x1="12" y1="22.08" x2="12" y2="12"></line>
-            </svg>
-          </div>
-          <h2 class="hero-title">How can I assist with your infrastructure today?</h2>
-          <p class="hero-desc">Ask questions about Kubernetes deployments, job scheduling, autoscaling, Intel architecture, or Databricks workflows.</p>
+      <!-- Screen reader announcer for live updates -->
+      <div id="srAnnouncer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+      <!-- Scrollable Messages Thread -->
+      <div class="messages-container" id="messagesContainer" tabindex="0" aria-label="Conversation message list">
+        <!-- Editorial Minimal Empty State -->
+        <section class="hero-welcome" id="heroWelcome" aria-label="Welcome and sample inquiries">
+          <div class="hero-badge">Document-Grounded Research Intelligence</div>
+          <h1 class="hero-title">Synthesize enterprise documentation with verifiable citations.</h1>
+          <p class="hero-desc">Queries are evaluated through safety guardrails, retrieved from vector storage, reranked with cross-encoders, and anchored to source passages.</p>
           
-          <div class="hero-chips">
-            <div class="hero-chip" data-prompt="How do you start Redis for a Kubernetes work queue?">
+          <div class="hero-chips" role="list">
+            <button class="hero-chip" data-prompt="How do you start Redis for a Kubernetes work queue?" type="button">
+              <div class="chip-header">
+                <span class="chip-tag">Kubernetes</span>
+                <span class="chip-arrow">→</span>
+              </div>
               <div class="chip-title">Redis Work Queue</div>
-              <div class="chip-desc">How to deploy and configure Redis in Kubernetes</div>
-            </div>
-            <div class="hero-chip" data-prompt="What is the difference between HPA and VPA in Kubernetes?">
+              <div class="chip-desc">Deploy and configure Redis worker queues in cluster specifications</div>
+            </button>
+            <button class="hero-chip" data-prompt="What is the difference between HPA and VPA in Kubernetes?" type="button">
+              <div class="chip-header">
+                <span class="chip-tag">Scaling</span>
+                <span class="chip-arrow">→</span>
+              </div>
               <div class="chip-title">HPA vs VPA</div>
-              <div class="chip-desc">Horizontal vs Vertical Pod Autoscaling breakdown</div>
-            </div>
-            <div class="hero-chip" data-prompt="How do CronJobs handle pod restarts in Kubernetes?">
-              <div class="chip-title">CronJobs &amp; Restart Policies</div>
-              <div class="chip-desc">OnFailure vs Never restart policies for Jobs</div>
-            </div>
+              <div class="chip-desc">Horizontal vs Vertical Pod Autoscaling operational trade-offs</div>
+            </button>
+            <button class="hero-chip" data-prompt="What are the completions and parallelism fields in a Kubernetes Job spec?" type="button">
+              <div class="chip-header">
+                <span class="chip-tag">Workloads</span>
+                <span class="chip-arrow">→</span>
+              </div>
+              <div class="chip-title">Job Parallelism</div>
+              <div class="chip-desc">Completions, parallelism, and restart policies in batch Jobs</div>
+            </button>
+            <button class="hero-chip" data-prompt="What Databricks CLI command retrieves details of a specific job?" type="button">
+              <div class="chip-header">
+                <span class="chip-tag">Databricks</span>
+                <span class="chip-arrow">→</span>
+              </div>
+              <div class="chip-title">Databricks Jobs</div>
+              <div class="chip-desc">CLI commands and API endpoints for inspecting job specifications</div>
+            </button>
           </div>
-        </div>
+
+          <div class="hero-footer-note">
+            <span class="evidence-rule-icon" aria-hidden="true">§</span>
+            <span>All responses strictly cite verifiable passages from ingested documentation.</span>
+          </div>
+        </section>
 
         <!-- Chat messages dynamically rendered here -->
-        <div class="chat-thread" id="chatThread"></div>
+        <div class="chat-thread" id="chatThread" aria-live="polite"></div>
       </div>
 
       <!-- Input Dock -->
       <div class="dock-container">
         <div class="dock-wrapper">
           <!-- Active generation control bar (hidden until streaming) -->
-          <div class="generation-bar" id="generationBar" style="display: none;">
+          <div class="generation-bar" id="generationBar" style="display: none;" role="status" aria-live="polite">
             <div class="gen-indicator">
-              <span class="gen-pulse"></span>
+              <span class="gen-pulse" aria-hidden="true"></span>
               <span class="gen-status-text" id="genStatusText">Agent is reasoning &amp; synthesizing...</span>
             </div>
-            <button class="btn-stop" id="stopResponseBtn" title="Stop generating response">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <button class="btn-stop" id="stopResponseBtn" type="button" title="Stop generating response">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="4" y="4" width="16" height="16" rx="2"></rect>
               </svg>
               <span>Stop Response</span>
             </button>
           </div>
 
-          <!-- Prompt Box -->
+          <!-- Prompt Form -->
           <form class="prompt-form" id="promptForm">
+            <label for="promptInput" class="visually-hidden">Ask a technical question</label>
             <textarea 
               id="promptInput" 
               class="prompt-textarea" 
-              placeholder="Ask about your documentation... (Shift+Enter for newline)" 
+              placeholder="Ask a technical inquiry grounded in documentation... (Shift+Enter for newline)" 
               rows="1" 
               autocomplete="off"
             ></textarea>
             <div class="dock-actions">
-              <button type="submit" class="btn-send" id="sendBtn" aria-label="Send query">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <button type="submit" class="btn-send" id="sendBtn" aria-label="Submit question" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="12" y1="19" x2="12" y2="5"></line>
                   <polyline points="5 12 12 5 19 12"></polyline>
                 </svg>
@@ -195,17 +239,51 @@
             </div>
           </form>
           <div class="dock-footer">
-            <span>Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for new line</span>
-            <span class="footer-sep">·</span>
+            <span>Press <kbd>Enter</kbd> to submit · <kbd>Shift + Enter</kbd> for new line</span>
+            <span class="footer-sep" aria-hidden="true">·</span>
             <span>Safety Guardrails Active</span>
           </div>
         </div>
       </div>
     </main>
+
+    <!-- Research Source Inspector Drawer -->
+    <div class="inspector-backdrop" id="inspectorBackdrop" aria-hidden="true"></div>
+    <aside class="source-inspector" id="sourceInspector" role="dialog" aria-labelledby="inspectorTitle" aria-modal="true" aria-hidden="true">
+      <div class="inspector-header">
+        <div class="inspector-title-group">
+          <div class="inspector-icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <div>
+            <h2 class="inspector-title" id="inspectorTitle">Source Inspector</h2>
+            <p class="inspector-subtitle">Retrieved context passages</p>
+          </div>
+        </div>
+        <button class="icon-btn inspector-close-btn" id="closeInspectorBtn" aria-label="Close Source Inspector">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="inspector-body" id="inspectorBody">
+        <div class="inspector-empty" id="inspectorEmpty">
+          <div class="empty-icon-wrap" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          </div>
+          <p class="empty-title">No Sources Selected</p>
+          <p class="empty-desc">Submit a technical question to inspect grounded context passages, relevance scores, and document chunks.</p>
+        </div>
+        <div class="inspector-sources-list" id="inspectorSourcesList" style="display: none;"></div>
+      </div>
+
+      <div class="inspector-footer" id="inspectorFooter">
+        <span class="inspector-stats" id="inspectorStats">0 sources retrieved</span>
+      </div>
+    </aside>
   </div>
 
   <!-- Toast Notification -->
-  <div class="toast" id="toast" role="alert"></div>
+  <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
 
   <script src="/static/js/app.js"></script>
 </body>
