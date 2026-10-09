@@ -1,7 +1,5 @@
 # ==============================================================================
 # PRODUCTION REQUIREMENTS — Container runtime (pinned versions)
-# Eval/local-only packages (ragas, sentence-transformers) are excluded
-# to avoid heavy ML build dependencies and minimize image footprint.
 # Full development dependencies → requirements.txt
 # ==============================================================================
 
@@ -16,6 +14,10 @@ pytz==2026.2
 # --- VECTOR DB & RETRIEVAL ---
 qdrant-client==1.17.1
 FlashRank==0.2.10
+sentence-transformers>=3.0.0
+
+# --- GEMINI EMBEDDINGS (OPTIONAL) ---
+langchain-google-genai>=2.0.0
 
 # --- LANGCHAIN & AGENTIC ORCHESTRATION ---
 langchain==1.2.18
