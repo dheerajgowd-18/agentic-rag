@@ -5,10 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Agentic RAG — Enterprise Document Intelligence & Research Workspace">
   <title>Agentic RAG — AI Research Workspace</title>
+  <meta name="color-scheme" content="light">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=3.2">
+  <style>
+    html, body {
+      color-scheme: light !important;
+      background-color: #F8F8F5 !important;
+      color: #242824 !important;
+    }
+    .source-inspector {
+      display: none;
+    }
+    .source-inspector.open {
+      display: flex !important;
+    }
+  </style>
 </head>
 <body>
   <!-- Off-canvas backdrop for mobile sidebar -->
@@ -221,10 +235,10 @@
 
           <!-- Prompt Form -->
           <form class="prompt-form" id="promptForm">
-            <label for="promptInput" class="visually-hidden">Ask a technical question</label>
             <textarea 
               id="promptInput" 
               class="prompt-textarea" 
+              aria-label="Ask a technical inquiry grounded in documentation"
               placeholder="Ask a technical inquiry grounded in documentation... (Shift+Enter for newline)" 
               rows="1" 
               autocomplete="off"
