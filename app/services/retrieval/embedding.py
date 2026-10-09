@@ -1,7 +1,7 @@
 import os
 import time
+import threading
 import logfire
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from app.config import settings
 
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
@@ -11,25 +11,37 @@ _GEMINI_DIM = 3072
 _LOCAL_MODEL_NAME = "all-MiniLM-L6-v2"
 _LOCAL_DIM = 384
 
+_init_lock = threading.Lock()
 _active_model = None
-_model_type: str | None = None  # "gemini" or "fallback"
+_model_type: str | None = None  # "gemini" or "local"
+_active_model_name: str | None = None
+_fallback_used: bool = False
+
+SUPPORTED_PROVIDERS = {"local", "sentence-transformers", "sentence_transformers", "gemini"}
 
 
 # ── Model initialisation ───────────────────────────────────────────────────────
 
 def _probe_gemini():
-    """Try one embed call to verify Gemini is reachable. Returns model or None."""
+    """Try one embed call to verify Gemini is reachable. Returns model or raises."""
     try:
-        model = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-2-preview",
-            google_api_key=settings.GEMINI_API_KEY,
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    except ImportError as ie:
+        raise ImportError(
+            "langchain-google-genai package is required when EMBEDDING_PROVIDER is 'gemini'. "
+            f"Install it or switch to 'local'. Details: {ie}"
         )
-        model.embed_query("probe")
-        logfire.info("Gemini embeddings ready (gemini-embedding-2-preview, 3072-dim).")
-        return model
-    except Exception as e:
-        logfire.warning(f"Gemini probe failed: {e}. Will use sentence-transformers fallback.")
-        return None
+
+    if not settings.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is not configured but EMBEDDING_PROVIDER is set to 'gemini'.")
+
+    model = GoogleGenerativeAIEmbeddings(
+        model="models/gemini-embedding-2-preview",
+        google_api_key=settings.GEMINI_API_KEY,
+    )
+    model.embed_query("probe")
+    logfire.info("Gemini embeddings ready (gemini-embedding-2-preview, 3072-dim).")
+    return model
 
 
 def _load_fallback():
@@ -42,28 +54,66 @@ def _load_fallback():
         _LOCAL_DIM = model.get_sentence_embedding_dimension()
     except Exception:
         _LOCAL_DIM = 384
-    return model
+    return model, model_name
 
 
 def _init():
-    """Initialise embedding model once per process. Called lazily on first use."""
-    global _active_model, _model_type
+    """Initialise embedding model once per process in a thread-safe manner. Called lazily on first use."""
+    global _active_model, _model_type, _active_model_name, _fallback_used
     if _active_model is not None:
         return
 
-    provider = (getattr(settings, "EMBEDDING_PROVIDER", None) or os.getenv("EMBEDDING_PROVIDER") or "local").lower().strip()
-    if provider in ("local", "sentence-transformers", "sentence_transformers"):
-        _active_model = _load_fallback()
-        _model_type = "fallback"
-        return
+    with _init_lock:
+        if _active_model is not None:
+            return
 
-    gemini = _probe_gemini()
-    if gemini:
-        _active_model = gemini
-        _model_type = "gemini"
-    else:
-        _active_model = _load_fallback()
-        _model_type = "fallback"
+        try:
+            raw_provider = getattr(settings, "EMBEDDING_PROVIDER", None) or os.getenv("EMBEDDING_PROVIDER") or "local"
+            provider = raw_provider.lower().strip()
+
+            if provider not in SUPPORTED_PROVIDERS:
+                raise ValueError(
+                    f"Unsupported EMBEDDING_PROVIDER '{provider}'. "
+                    f"Supported providers are: {sorted(SUPPORTED_PROVIDERS)}"
+                )
+
+            if provider in ("local", "sentence-transformers", "sentence_transformers"):
+                model, name = _load_fallback()
+                _active_model = model
+                _model_type = "local"
+                _active_model_name = name
+                _fallback_used = False
+                return
+
+            if provider == "gemini":
+                try:
+                    gemini = _probe_gemini()
+                    _active_model = gemini
+                    _model_type = "gemini"
+                    _active_model_name = "models/gemini-embedding-2-preview"
+                    _fallback_used = False
+                except Exception as e:
+                    allow_fallback = getattr(settings, "ALLOW_EMBEDDING_FALLBACK", False) or os.getenv("ALLOW_EMBEDDING_FALLBACK", "false").lower() == "true"
+                    if allow_fallback:
+                        logfire.warning(f"⚠️ Gemini embedding failed ({e}); falling back to local sentence-transformers because ALLOW_EMBEDDING_FALLBACK is enabled.")
+                        model, name = _load_fallback()
+                        _active_model = model
+                        _model_type = "local"
+                        _active_model_name = name
+                        _fallback_used = True
+                    else:
+                        logfire.error(f"❌ Gemini embedding initialization failed: {e}")
+                        raise RuntimeError(
+                            f"Configured EMBEDDING_PROVIDER 'gemini' failed to initialize: {e}. "
+                            "Refusing to silently switch embedding models against vector collection. "
+                            "Set ALLOW_EMBEDDING_FALLBACK=true to allow automatic fallback."
+                        ) from e
+        except Exception:
+            _active_model = None
+            _model_type = None
+            _active_model_name = None
+            _fallback_used = False
+            raise
 
 
 # ── Public helpers ─────────────────────────────────────────────────────────────
@@ -72,6 +122,17 @@ def get_embedding_dim() -> int:
     """Return the vector dimension for the active model. Call after _init()."""
     _init()
     return _GEMINI_DIM if _model_type == "gemini" else _LOCAL_DIM
+
+
+def get_active_embedding_metadata() -> dict:
+    """Return runtime metadata about the active embedding configuration."""
+    _init()
+    return {
+        "provider": _model_type,
+        "model_name": _active_model_name,
+        "dimension": get_embedding_dim(),
+        "fallback_used": _fallback_used,
+    }
 
 
 # ── Batch embedding with retry ─────────────────────────────────────────────────
