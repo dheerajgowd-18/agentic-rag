@@ -14,17 +14,7 @@ import pandas as pd
 from openai import AsyncOpenAI
 
 
-from ragas.llms import llm_factory
-from ragas.embeddings import HuggingFaceEmbeddings
-from ragas import SingleTurnSample
-from ragas.metrics.collections import (
-    Faithfulness,
-    AnswerRelevancy,
-    ContextPrecision,
-    ContextRecall,
-    AnswerCorrectness,
-)
-
+# Ragas imports are lazily loaded inside _build_judge and run_all_metrics
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 JUDGE_MODEL = os.getenv("JUDGE_MODEL") or "openai/gpt-oss-20b"
 COOLDOWN_STANDARD = int(os.getenv("EVAL_COOLDOWN_STANDARD", "62"))
@@ -36,6 +26,9 @@ CONTEXT_LIMIT = int(os.getenv("EVAL_CONTEXT_LIMIT", "3"))       # number of cont
 
 
 def _build_judge():
+    from ragas.llms import llm_factory
+    from ragas.embeddings import HuggingFaceEmbeddings
+
     api_key = os.getenv("JUDGE_GROQ") or os.getenv("GROQ_API_KEY")
     client = AsyncOpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
     llm = llm_factory(JUDGE_MODEL, provider="openai", client=client)
@@ -55,21 +48,59 @@ async def _cooldown(seconds: int, label: str, status_cb=None):
         status_cb(f"✅ Ready — starting next experiment.")
         
         
+def get_evaluation_diagnostics(golden_dataset: dict) -> dict:
+    """
+    Summarizes diagnostics for an evaluation dataset.
+    Reports total samples, successes, failures, missing contexts, exclusions, and fallback usage.
+    """
+    samples = golden_dataset.get("rag_samples", [])
+    total = len(samples)
+    successful = sum(1 for s in samples if s.get("actual_response", "").strip() and s.get("pipeline_status") != "failed")
+    failed = sum(1 for s in samples if s.get("pipeline_status") == "failed" or not s.get("actual_response", "").strip())
+    with_contexts = sum(1 for s in samples if s.get("actual_contexts"))
+    empty_contexts = sum(1 for s in samples if not s.get("actual_contexts"))
+    fallback_contexts = sum(1 for s in samples if s.get("used_fallback_contexts"))
+    excluded = total - successful
+
+    return {
+        "total_samples": total,
+        "successful_live_queries": successful,
+        "failed_live_queries": failed,
+        "samples_with_contexts": with_contexts,
+        "samples_empty_contexts": empty_contexts,
+        "samples_using_fallback_contexts": fallback_contexts,
+        "excluded_from_metrics": excluded,
+    }
+
+
 def _prep_samples(golden_dataset: dict) -> list:
     """
-    Returns only samples with actual_response populated.
-    Truncates contexts to CONTEXT_TRUNCATE chars and limits to CONTEXT_LIMIT chunks
+    Returns only samples with actual_response populated and not failed.
+    Normalizes contexts to text strings, truncates to CONTEXT_TRUNCATE chars and limits to CONTEXT_LIMIT chunks
     so a single RAGAS LLM call stays well under the 6,000 TPM ceiling.
-    (Live contexts from Qdrant are ~1,500 chars each — without truncation a single
-    Faithfulness request exceeds 7,000 tokens which hard-fails on the on_demand tier.)
+    Does not substitute reference contexts for failed live retrieval.
     """
     valid = []
-    for s in golden_dataset["rag_samples"]:
+    for s in golden_dataset.get("rag_samples", []):
         response = s.get("actual_response", "").strip()
         if not response:
             continue
-        raw_contexts = s.get("actual_contexts") or s.get("relevant_contexts") or []
-        contexts = [c[:CONTEXT_TRUNCATE] for c in raw_contexts[:CONTEXT_LIMIT]]
+        if s.get("pipeline_status") == "failed":
+            continue
+        raw_contexts = s.get("actual_contexts")
+        if raw_contexts is None:
+            raw_contexts = []
+        contexts = []
+        for c in raw_contexts[:CONTEXT_LIMIT]:
+            if isinstance(c, dict):
+                text = c.get("content") or c.get("text") or ""
+            elif isinstance(c, str):
+                text = c
+            else:
+                text = str(c)
+            text = text.strip()
+            if text:
+                contexts.append(text[:CONTEXT_TRUNCATE])
         valid.append({**s, "actual_contexts": contexts})
     return valid
 
@@ -100,6 +131,13 @@ async def run_all_metrics(golden_dataset: dict, status_cb=None) -> dict:
     Runs all 6 experiments. Returns dict keyed by metric name → DataFrame.
     status_cb(message: str) is called for live UI updates.
     """
+    from ragas.metrics.collections import (
+        Faithfulness,
+        AnswerRelevancy,
+        ContextPrecision,
+        ContextRecall,
+        AnswerCorrectness,
+    )
     judge_llm, ragas_embeddings = _build_judge()
     samples = _prep_samples(golden_dataset)
 
@@ -207,16 +245,19 @@ async def run_all_metrics(golden_dataset: dict, status_cb=None) -> dict:
 
         await _cooldown(COOLDOWN_STANDARD, "Answer Correctness", status_cb)
 
-        # ── Exp 6: Tool Correctness (no LLM — Jaccard) ───────────────────────
+        # ── Exp 6: Workflow Tool / Routing Correctness (Jaccard similarity) ───
         if status_cb:
-            status_cb("⚡ Exp 6/6 — Tool Correctness (zero LLM calls)...")
-        with logfire.span("🧪 Exp 6 — Tool Correctness"):
+            status_cb("⚡ Exp 6/6 — Workflow Execution Correctness (zero LLM calls)...")
+        with logfire.span("🧪 Exp 6 — Workflow Routing Correctness"):
             tool_rows = []
             for s in samples:
                 called = set(s.get("actual_tools_called") or [])
                 expected = set(s.get("expected_tools") or [])
-                union = len(called | expected)
-                score = len(called & expected) / union if union > 0 else 0.0
+                if not called and not expected:
+                    score = 1.0  # Agreement: neither requires tools
+                else:
+                    union = len(called | expected)
+                    score = len(called & expected) / union if union > 0 else 0.0
                 tool_rows.append({"question": s["question"][:65], "tool_correctness": round(score, 3)})
             df = pd.DataFrame(tool_rows)
             results["tool_correctness"] = df
